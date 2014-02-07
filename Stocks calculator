@@ -1,0 +1,140 @@
+# -*- coding: utf-8 -*-
+"""
+Created :           Sat Dec 14 22:47:34 2012
+author:             Finbar Timmins
+email:              finbar.t@gmail.com
+ 
+Python code to parse a .csv file of company stock info, get the average
+closing prices per monthm. Its returns both best and worst periods and
+lists of best and worst individual months.
+"""
+import csv
+#functions:
+ 
+ 
+def parse_csv(filename):
+    '''
+    Fuction takes a filename and returns a list of dictionaries
+    containing {'date' : string(yyyy-mm), 'volume' : float(Volume),
+    'close_adj' : float(Close Adjust)} from every row in the .csv
+    file less the header row
+    '''
+ 
+    csv_file = open(filename, 'rU')
+    csv_data = csv.reader(csv_file)
+    csv_data.next()  #chops the headers off
+ 
+    monthly_data = [{
+        'date': row[0][0:7],
+        'volume': int(row[5]),
+        'close_adj': float(row[6])
+        } for row in csv_data
+    ]
+    csv_file.close()
+    return monthly_data
+ 
+ 
+def get_averages(monthly_data):
+    '''
+    Function, takes a list of dictionaries {'Date' : string(yyyy-mm),
+    'volume' : float(Volumn),  'close_adj' : float(Close Adjust)}.
+    It groups the days of a month in a list, gets the average for
+    that month and appends the month and average as a tuple
+    (str('yyyy-mm'), float(average price)) to a list which is then returned
+    when the operation is complete.
+    '''
+    month_average = []
+    prev_date = ''
+ 
+    get_month = lambda x, y: [month for month in x if month['date'] == y]
+    get_average = lambda x: (
+        sum(month['close_adj'] * month['volume'] for month in x) /
+        sum(month['volume'] for month in x)
+    )
+ 
+    for i in range(len(monthly_data)):
+        if not prev_date == monthly_data[i]['date']:
+            average = get_average(
+                get_month(monthly_data, monthly_data[i]['date'])
+            )
+            month_average.append((monthly_data[i]['date'], average))
+            prev_date = monthly_data[i]['date']
+ 
+    return month_average
+ 
+ 
+def get_periods(monthly_averages, period_length=6):
+    '''
+    Funtion takes of a list of tuples (str('yyyy-mm'), float(average)) and
+    variable period length (default set at 6 months). It uses the average
+    price per month to return a list of tuples each containing a period and an
+    average price for that period (str('yyyy-mm -> yyyy-mm'), float(average))
+    '''
+    periods = []
+ 
+    get_period_months = lambda x, y, z: [period for period in x[y:y + z]]
+ 
+    for i in xrange(len(monthly_averages)):
+        period = get_period_months(monthly_averages, i, period_length)
+        periods.append((
+            period[-1][0] + " -> " + period[0][0],
+            sum(month[1] for month in period) / period_length)
+        )
+ 
+    return periods[0:len(periods) - period_length + 1]
+ 
+ 
+def get_best_worst_months(averages, number_of_months=6):
+    '''
+    Function takes a list of tuples (str('yyyy-mm'), float(average)) and a
+    variable number of months to be returned for best and worst
+    (defaulted to 6 months). It sorts this list according to the average in
+    each month. It then returns a dictionary containing two lists best months
+    and worst months {'best': best_months[], 'worst': best_months[]}
+    '''
+    months = sorted(averages, key=lambda x: x[1])
+    '''
+    I realise [0 - number_of_months:] could have just been [-number_of_months:]
+    but this was not pep8 compliant as you need white space around your
+    operators. When I did this [ - number_of_months:] pep8 complained about
+    white space after [. So the only solution I could see was to add the 0
+    '''
+    return {
+        'best': months[0 - number_of_months:],
+        'worst': months[:number_of_months]
+    }
+ 
+ 
+def main():
+    #calling code :
+    monthly_data = parse_csv('googlePrices.csv')
+    averages = get_averages(monthly_data)
+    best_worst_months = get_best_worst_months(averages)
+    periods = get_periods(averages)
+ 
+    best_period = max(periods, key=lambda x: x[1])
+    worst_period = min(periods, key=lambda x: x[1])
+ 
+    print "Best individual months: "
+ 
+    for month in best_worst_months['best']:
+        print "Month: %s  Average: %f" % (month[0], month[1])
+ 
+    print "\n"
+    print "Worst individual months: "
+ 
+    for month in best_worst_months['worst']:
+        print "Month: %s  Average: %f" % (month[0], month[1])
+ 
+    print "\n"
+    print "Best 6 month period:  %s   Period average: %f" % (
+        best_period[0],
+        best_period[-1]
+    )
+    print "Worst 6 month period: %s   Period average: %f" % (
+        worst_period[0],
+        worst_period[-1]
+    )
+
+if __name__ == '__main__':
+    main()
